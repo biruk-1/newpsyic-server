@@ -6,6 +6,7 @@
     "dev": "nodemon index.js"
   },
   "dependencies": {
+    "better-sqlite3": "^11.9.1",
     "cors": "^2.8.5",
     "cross-env": "^7.0.3",
     "dotenv": "^16.4.7",
