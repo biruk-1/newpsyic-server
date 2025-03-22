@@ -1,0 +1,12 @@
+{
+  "expo": {
+    "extra": {
+      "eas": {
+        "projectId": "65d235fa-ab52-41ae-97a7-ba258fd07d33"
+      }
+    },
+    "android": {
+      "package": "com.biruk123.psychicdirectoryserver"
+    }
+  }
+}
