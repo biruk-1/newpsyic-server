@@ -29,7 +29,8 @@ router.post('/create-payment-intent', async (req, res) => {
     const paymentIntent = await stripe.paymentIntents.create({
       amount,
       currency,
-      customer: customer.id, // Associate the customer
+      customer: customer.id, 
+      payment_method_types: ['card', 'apple_pay', 'google_pay'],
     });
     console.log('Payment intent created:', paymentIntent.id);
 

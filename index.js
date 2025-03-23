@@ -12,6 +12,8 @@ const bookingRoutes = require('./routes/bookings');
 const stripeRoutes = require('./routes/stripe');
 const twilioRoutes = require('./routes/twilio'); // Add Twilio routes
 
+const path = require('path');
+
 // Load environment variables
 require('dotenv').config();
 console.log("Stripe Secret Key:", process.env.STRIPE_SECRET_KEY);
@@ -68,6 +70,10 @@ app.use('/api/twilio', twilioRoutes);     // Mount Twilio routes
 console.log("Setting up error handler...");
 console.log("errorHandler loaded:", errorHandler);
 app.use(errorHandler);
+
+app.get('/.well-known/apple-developer-merchantid-domain-association', (req, res) => {
+  res.sendFile(path.join(__dirname, 'apple-developer-merchantid-domain-association'));
+});
 
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
