@@ -14,6 +14,15 @@ router.post('/send-verification', async (req, res) => {
 
   try {
     console.log(`[Twilio Backend] Sending verification to: ${phone}`);
+    console.log(`[Twilio Backend] TWILIO_ACCOUNT_SID: ${process.env.TWILIO_ACCOUNT_SID}`);
+    console.log(`[Twilio Backend] TWILIO_AUTH_TOKEN: ${process.env.TWILIO_AUTH_TOKEN}`);
+    console.log(`[Twilio Backend] TWILIO_VERIFY_SERVICE_SID: ${process.env.TWILIO_VERIFY_SERVICE_SID}`);
+
+    // Validate SID before making the request
+    if (!process.env.TWILIO_VERIFY_SERVICE_SID || !process.env.TWILIO_VERIFY_SERVICE_SID.startsWith('VA')) {
+      throw new Error('Invalid or missing TWILIO_VERIFY_SERVICE_SID');
+    }
+
     const verification = await client.verify.v2
       .services(process.env.TWILIO_VERIFY_SERVICE_SID)
       .verifications.create({ to: phone, channel: 'sms' });
@@ -21,7 +30,7 @@ router.post('/send-verification', async (req, res) => {
     res.json({ 
       success: true, 
       verificationId: verification.sid, 
-      expiresAt: Date.now() + 10 * 60 * 1000 // Twilio default is 10 minutes
+      expiresAt: Date.now() + 10 * 60 * 1000
     });
   } catch (error) {
     console.error('[Twilio Backend] Error:', error.message);
@@ -38,6 +47,13 @@ router.post('/verify-code', async (req, res) => {
 
   try {
     console.log(`[Twilio Backend] Verifying code for SID: ${verificationId}`);
+    console.log(`[Twilio Backend] TWILIO_VERIFY_SERVICE_SID: ${process.env.TWILIO_VERIFY_SERVICE_SID}`);
+
+    // Validate SID before making the request
+    if (!process.env.TWILIO_VERIFY_SERVICE_SID || !process.env.TWILIO_VERIFY_SERVICE_SID.startsWith('VA')) {
+      throw new Error('Invalid or missing TWILIO_VERIFY_SERVICE_SID');
+    }
+
     const check = await client.verify.v2
       .services(process.env.TWILIO_VERIFY_SERVICE_SID)
       .verificationChecks.create({ verificationSid: verificationId, code });
