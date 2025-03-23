@@ -3,17 +3,18 @@ const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
-const { errorHandler } = require('./middleware/errorHandler'); // Destructuring works with the updated export
+const { errorHandler } = require('./middleware/errorHandler');
 const { setupDatabase } = require('./database');
 const authRoutes = require('./routes/auth');
 const psychicRoutes = require('./routes/psychics');
 const reviewRoutes = require('./routes/reviews');
 const bookingRoutes = require('./routes/bookings');
+const stripeRoutes = require('./routes/stripe');
+const twilioRoutes = require('./routes/twilio'); // Add Twilio routes
+
 // Load environment variables
 require('dotenv').config();
 console.log("Stripe Secret Key:", process.env.STRIPE_SECRET_KEY);
-
-const stripeRoutes = require('./routes/stripe');
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -26,7 +27,7 @@ setupDatabase();
 console.log("Setting up basic security middleware...");
 app.use(helmet());
 app.use(cors({
-  origin: ['http://localhost:19006', 'http://localhost:8081', 'http://localhost:19000', 'exp://localhost:19000'],
+  origin: ['http://localhost:19006', 'http://localhost:8081', 'http://localhost:19000', 'exp://localhost:19000',*],
   methods: ['GET', 'POST'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true
@@ -60,9 +61,12 @@ app.use('/api/bookings', bookingRoutes);
 console.log("Setting up stripeRoutes...");
 app.use('/api/stripe', stripeRoutes);
 
+console.log("Setting up twilioRoutes..."); // Add Twilio setup log
+app.use('/api/twilio', twilioRoutes);     // Mount Twilio routes
+
 // Error handling
 console.log("Setting up error handler...");
-console.log("errorHandler loaded:", errorHandler); // Debug log to verify
+console.log("errorHandler loaded:", errorHandler);
 app.use(errorHandler);
 
 app.listen(port, () => {
