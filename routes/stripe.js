@@ -30,7 +30,7 @@ router.post('/create-payment-intent', async (req, res) => {
       amount,
       currency,
       customer: customer.id, 
-      payment_method_types: ['card', 'google_pay'],
+      payment_method_types: ['card'],
     });
     console.log('Payment intent created:', paymentIntent.id);
 
