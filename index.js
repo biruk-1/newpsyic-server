@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -15,11 +16,10 @@ const twilioRoutes = require('./routes/twilio'); // Add Twilio routes
 const path = require('path');
 
 // Load environment variables
-require('dotenv').config();
 console.log("Stripe Secret Key:", process.env.STRIPE_SECRET_KEY);
 
 const app = express();
-const port = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3000;
 
 // Initialize database
 console.log("Initializing database...");
@@ -66,15 +66,20 @@ app.use('/api/stripe', stripeRoutes);
 console.log("Setting up twilioRoutes..."); // Add Twilio setup log
 app.use('/api/twilio', twilioRoutes);     // Mount Twilio routes
 
-// Error handling
-console.log("Setting up error handler...");
-console.log("errorHandler loaded:", errorHandler);
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok' });
+});
+
+// Error handling middleware
 app.use(errorHandler);
 
 app.get('/.well-known/apple-developer-merchantid-domain-association', (req, res) => {
   res.sendFile(path.join(__dirname, 'apple-developer-merchantid-domain-association'));
 });
 
-app.listen(port, () => {
-  console.log(`Server running on port ${port}`);
+// Start server
+app.listen(PORT, () => {
+  console.log(`Server is running on port ${PORT}`);
+  console.log('Environment:', process.env.NODE_ENV);
 });

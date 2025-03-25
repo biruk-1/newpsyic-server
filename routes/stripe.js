@@ -1,53 +1,141 @@
 const express = require('express');
 const router = express.Router();
-const Stripe = require('stripe');
-require('dotenv').config();
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
-console.log("Stripe Key:", process.env.STRIPE_SECRET_KEY);
-
-router.post('/create-payment-intent', async (req, res) => {
+// Create payment sheet
+router.post('/create-payment-sheet', async (req, res) => {
   try {
-    const { amount, currency } = req.body;
-    console.log('Received payment intent request:', { amount, currency });
+    const { amount, currency = 'usd', payment_method_types, payment_method_options } = req.body;
+    console.log('Creating payment sheet with amount:', amount);
+    console.log('Payment method types:', payment_method_types);
+    console.log('Payment method options:', payment_method_options);
 
-    // Validate amount is an integer
-    if (!Number.isInteger(amount)) {
-      return res.status(400).send({ error: 'Amount must be an integer in cents' });
-    }
-    if (amount <= 0) {
-      return res.status(400).send({ error: 'Amount must be greater than zero' });
+    if (!amount || amount <= 0) {
+      throw new Error('Invalid amount provided');
     }
 
-    // Create a new customer for this payment
+    // Create a customer
     const customer = await stripe.customers.create({
-      description: 'Temporary customer for payment intent',
+      metadata: {
+        integration_check: 'accept_a_payment',
+      },
     });
     console.log('Created customer:', customer.id);
 
-    // Create payment intent with the customer
-    const paymentIntent = await stripe.paymentIntents.create({
-      amount,
-      currency,
-      customer: customer.id, 
-      payment_method_types: ['card'],
-    });
-    console.log('Payment intent created:', paymentIntent.id);
-
     // Create an ephemeral key for the customer
     const ephemeralKey = await stripe.ephemeralKeys.create(
-      { customer: customer.id },
-      { apiVersion: '2022-11-15' }
+      {
+        customer: customer.id,
+      },
+      {
+        apiVersion: '2023-10-16',
+      }
     );
+    console.log('Created ephemeral key');
 
-    res.send({
+    // Create a payment intent
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount: amount, // Amount is already in cents from client
+      currency,
+      customer: customer.id,
+      payment_method_types,
+      payment_method_options,
+      metadata: {
+        integration_check: 'accept_a_payment',
+        platform: req.body.metadata?.platform || 'unknown'
+      },
+    });
+    console.log('Created payment intent:', paymentIntent.id);
+
+    res.json({
       paymentIntent: paymentIntent.client_secret,
       ephemeralKey: ephemeralKey.secret,
       customer: customer.id,
     });
   } catch (error) {
-    console.error('Error in create-payment-intent:', error.message);
-    res.status(500).send({ error: error.message });
+    console.error('Error creating payment sheet:', error);
+    console.error('Error details:', {
+      message: error.message,
+      type: error.type,
+      code: error.code,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
+    
+    res.status(500).json({ 
+      error: error.message,
+      type: error.type,
+      code: error.code,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
+  }
+});
+
+// Create subscription
+router.post('/create-subscription', async (req, res) => {
+  try {
+    const { priceId, payment_method_types, payment_method_options } = req.body;
+    console.log('Creating subscription for price:', priceId);
+    console.log('Payment method types:', payment_method_types);
+    console.log('Payment method options:', payment_method_options);
+
+    if (!priceId) {
+      throw new Error('Price ID is required');
+    }
+
+    // Create a customer
+    const customer = await stripe.customers.create({
+      metadata: {
+        integration_check: 'accept_a_payment',
+      },
+    });
+    console.log('Created customer:', customer.id);
+
+    // Create an ephemeral key for the customer
+    const ephemeralKey = await stripe.ephemeralKeys.create(
+      {
+        customer: customer.id,
+      },
+      {
+        apiVersion: '2023-10-16',
+      }
+    );
+    console.log('Created ephemeral key');
+
+    // Create a subscription
+    const subscription = await stripe.subscriptions.create({
+      customer: customer.id,
+      items: [{ price: priceId }],
+      payment_behavior: 'default_incomplete',
+      payment_settings: { 
+        save_default_payment_method: 'on_subscription',
+        payment_method_types,
+        payment_method_options
+      },
+      expand: ['latest_invoice.payment_intent'],
+    });
+    console.log('Created subscription:', subscription.id);
+
+    res.json({
+      subscriptionId: subscription.id,
+      clientSecret: subscription.latest_invoice.payment_intent.client_secret,
+      ephemeralKey: ephemeralKey.secret,
+      customer: customer.id,
+    });
+  } catch (error) {
+    console.error('Error creating subscription:', error);
+    console.error('Error details:', {
+      message: error.message,
+      type: error.type,
+      code: error.code,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
+    
+    res.status(500).json({ 
+      error: error.message,
+      type: error.type,
+      code: error.code,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
   }
 });
 
