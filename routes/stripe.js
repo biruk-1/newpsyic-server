@@ -27,8 +27,8 @@ router.post('/create-payment-sheet', async (req, res) => {
     );
     console.log('Created ephemeral key');
 
-    // Create a payment intent with enhanced configuration
-    const paymentIntent = await stripe.paymentIntents.create({
+    // Configure payment intent parameters
+    const paymentIntentParams = {
       amount,
       currency,
       customer: customer.id,
@@ -41,9 +41,23 @@ router.post('/create-payment-sheet', async (req, res) => {
       metadata: {
         integration_check: 'accept_a_payment',
         platform: metadata?.platform || 'unknown'
-      },
-    });
+      }
+    };
 
+    // Add Apple Pay specific configuration if needed
+    if (payment_method_types.includes('apple_pay')) {
+      paymentIntentParams.payment_method_options = {
+        ...paymentIntentParams.payment_method_options,
+        card: {
+          ...paymentIntentParams.payment_method_options.card,
+          requestPayerName: true,
+          requestPayerEmail: true
+        }
+      };
+    }
+
+    // Create a payment intent with enhanced configuration
+    const paymentIntent = await stripe.paymentIntents.create(paymentIntentParams);
     console.log('Created payment intent:', paymentIntent.id);
 
     res.json({
