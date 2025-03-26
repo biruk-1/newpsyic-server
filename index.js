@@ -29,9 +29,9 @@ setupDatabase();
 console.log("Setting up basic security middleware...");
 app.use(helmet());
 app.use(cors({
-  origin: ['http://localhost:19006', 'http://localhost:8081', 'http://localhost:19000', 'exp://localhost:19000', '*'],
-  methods: ['GET', 'POST'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  origin: true, // Allow all origins in development
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
   credentials: true
 }));
 app.use(express.json());

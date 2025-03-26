@@ -5,10 +5,8 @@ const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 // Create payment sheet
 router.post('/create-payment-sheet', async (req, res) => {
   try {
-    const { amount, currency = 'usd', payment_method_types, payment_method_options } = req.body;
-    console.log('Creating payment sheet with amount:', amount);
-    console.log('Payment method types:', payment_method_types);
-    console.log('Payment method options:', payment_method_options);
+    const { amount, currency = 'usd', payment_method_types = ['card', 'apple_pay'], payment_method_options } = req.body;
+    console.log('Received request:', { amount, currency, payment_method_types, payment_method_options });
 
     if (!amount || amount <= 0) {
       throw new Error('Invalid amount provided');
@@ -24,27 +22,42 @@ router.post('/create-payment-sheet', async (req, res) => {
 
     // Create an ephemeral key for the customer
     const ephemeralKey = await stripe.ephemeralKeys.create(
-      {
-        customer: customer.id,
-      },
-      {
-        apiVersion: '2023-10-16',
-      }
+      { customer: customer.id },
+      { apiVersion: '2023-10-16' }
     );
     console.log('Created ephemeral key');
 
-    // Create a payment intent
+    // Configure payment method options
+    const paymentMethodOptions = {
+      card: {
+        setup_future_usage: 'off_session',
+        requestPayerName: true,
+        requestPayerEmail: true,
+      },
+      apple_pay: {
+        payment_type: 'immediate',
+        merchant_capabilities: ['supports3DS', 'supportsCredit', 'supportsDebit'],
+        supported_networks: ['visa', 'mastercard', 'amex', 'discover']
+      }
+    };
+
+    // Create a payment intent with enhanced configuration
     const paymentIntent = await stripe.paymentIntents.create({
-      amount: amount, // Amount is already in cents from client
+      amount,
       currency,
       customer: customer.id,
       payment_method_types,
       payment_method_options,
+      automatic_payment_methods: {
+        enabled: true,
+        allow_redirects: 'never'
+      },
       metadata: {
         integration_check: 'accept_a_payment',
         platform: req.body.metadata?.platform || 'unknown'
       },
     });
+
     console.log('Created payment intent:', paymentIntent.id);
 
     res.json({
@@ -54,18 +67,9 @@ router.post('/create-payment-sheet', async (req, res) => {
     });
   } catch (error) {
     console.error('Error creating payment sheet:', error);
-    console.error('Error details:', {
-      message: error.message,
-      type: error.type,
-      code: error.code,
-      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
-    });
-    
-    res.status(500).json({ 
+    res.status(500).json({
       error: error.message,
-      type: error.type,
-      code: error.code,
-      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      details: error.type || 'unknown_error'
     });
   }
 });
