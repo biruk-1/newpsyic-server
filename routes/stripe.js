@@ -32,7 +32,11 @@ router.post('/create-payment-sheet', async (req, res) => {
       amount,
       currency,
       customer: customer.id,
-      payment_method_options,
+      payment_method_options: {
+        card: {
+          setup_future_usage: 'off_session'
+        }
+      },
       automatic_payment_methods: {
         enabled: true,
         allow_redirects: 'never'
@@ -42,18 +46,6 @@ router.post('/create-payment-sheet', async (req, res) => {
         platform: metadata?.platform || 'unknown'
       }
     };
-
-    // Add Apple Pay specific configuration if needed
-    if (metadata?.platform === 'ios') {
-      paymentIntentParams.payment_method_options = {
-        ...paymentIntentParams.payment_method_options,
-        card: {
-          ...paymentIntentParams.payment_method_options.card,
-          requestPayerName: true,
-          requestPayerEmail: true
-        }
-      };
-    }
 
     // Create a payment intent with enhanced configuration
     const paymentIntent = await stripe.paymentIntents.create(paymentIntentParams);
