@@ -46,7 +46,6 @@ router.post('/create-payment-sheet', async (req, res) => {
       amount,
       currency,
       customer: customer.id,
-      payment_method_types,
       payment_method_options,
       automatic_payment_methods: {
         enabled: true,
