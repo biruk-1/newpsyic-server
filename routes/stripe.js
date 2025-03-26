@@ -5,8 +5,8 @@ const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 // Create payment sheet
 router.post('/create-payment-sheet', async (req, res) => {
   try {
-    const { amount, currency = 'usd', payment_method_types, payment_method_options, metadata } = req.body;
-    console.log('Received request:', { amount, currency, payment_method_types, payment_method_options, metadata });
+    const { amount, currency = 'usd', payment_method_options, metadata } = req.body;
+    console.log('Received request:', { amount, currency, payment_method_options, metadata });
 
     if (!amount || amount <= 0) {
       throw new Error('Invalid amount provided');
@@ -32,7 +32,6 @@ router.post('/create-payment-sheet', async (req, res) => {
       amount,
       currency,
       customer: customer.id,
-      payment_method_types,
       payment_method_options,
       automatic_payment_methods: {
         enabled: true,
@@ -45,7 +44,7 @@ router.post('/create-payment-sheet', async (req, res) => {
     };
 
     // Add Apple Pay specific configuration if needed
-    if (payment_method_types.includes('apple_pay')) {
+    if (metadata?.platform === 'ios') {
       paymentIntentParams.payment_method_options = {
         ...paymentIntentParams.payment_method_options,
         card: {
