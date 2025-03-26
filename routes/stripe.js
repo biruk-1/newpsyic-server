@@ -5,8 +5,8 @@ const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 // Create payment sheet
 router.post('/create-payment-sheet', async (req, res) => {
   try {
-    const { amount, currency = 'usd', payment_method_types = ['card', 'apple_pay'], payment_method_options } = req.body;
-    console.log('Received request:', { amount, currency, payment_method_types, payment_method_options });
+    const { amount, currency = 'usd', payment_method_types, payment_method_options, metadata } = req.body;
+    console.log('Received request:', { amount, currency, payment_method_types, payment_method_options, metadata });
 
     if (!amount || amount <= 0) {
       throw new Error('Invalid amount provided');
@@ -27,25 +27,12 @@ router.post('/create-payment-sheet', async (req, res) => {
     );
     console.log('Created ephemeral key');
 
-    // Configure payment method options
-    const paymentMethodOptions = {
-      card: {
-        setup_future_usage: 'off_session',
-        requestPayerName: true,
-        requestPayerEmail: true,
-      },
-      apple_pay: {
-        payment_type: 'immediate',
-        merchant_capabilities: ['supports3DS', 'supportsCredit', 'supportsDebit'],
-        supported_networks: ['visa', 'mastercard', 'amex', 'discover']
-      }
-    };
-
     // Create a payment intent with enhanced configuration
     const paymentIntent = await stripe.paymentIntents.create({
       amount,
       currency,
       customer: customer.id,
+      payment_method_types,
       payment_method_options,
       automatic_payment_methods: {
         enabled: true,
@@ -53,7 +40,7 @@ router.post('/create-payment-sheet', async (req, res) => {
       },
       metadata: {
         integration_check: 'accept_a_payment',
-        platform: req.body.metadata?.platform || 'unknown'
+        platform: metadata?.platform || 'unknown'
       },
     });
 
