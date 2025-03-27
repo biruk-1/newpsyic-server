@@ -147,51 +147,45 @@ router.post('/create-payment-sheet', async (req, res) => {
     const { amount, currency = 'usd', payment_method_options, metadata } = req.body;
     console.log('Received request:', { amount, currency, payment_method_options, metadata });
 
-    // Validate amount
     if (!Number.isInteger(amount) || amount <= 0) {
       throw new Error('Invalid amount provided; must be a positive integer');
     }
 
-    // Create a customer
     const customer = await stripe.customers.create({
       metadata: {
         integration_check: 'accept_a_payment',
-        ...metadata, // Merge any additional metadata from request
+        ...metadata,
       },
     });
     console.log('Created customer:', customer.id);
 
-    // Create an ephemeral key for the customer
     const ephemeralKey = await stripe.ephemeralKeys.create(
       { customer: customer.id },
       { apiVersion: '2023-10-16' }
     );
     console.log('Created ephemeral key');
 
-    // Configure payment intent parameters
     const paymentIntentParams = {
       amount,
       currency,
       customer: customer.id,
-      payment_method_types: ['card'], // Explicitly support card (includes Apple Pay/Google Pay)
       payment_method_options: {
         card: {
           setup_future_usage: 'off_session',
-          ...payment_method_options?.card, // Merge any custom card options from request
+          ...payment_method_options?.card,
         },
       },
       automatic_payment_methods: {
         enabled: true,
-        allow_redirects: 'never', // No redirects for native mobile wallets
+        allow_redirects: 'never',
       },
       metadata: {
         integration_check: 'accept_a_payment',
         platform: metadata?.platform || 'unknown',
-        ...metadata, // Merge additional metadata
+        ...metadata,
       },
     };
 
-    // Create a payment intent
     const paymentIntent = await stripe.paymentIntents.create(paymentIntentParams);
     console.log('Created payment intent:', paymentIntent.id);
 
@@ -215,12 +209,10 @@ router.post('/create-subscription', async (req, res) => {
     const { priceId, payment_method_types, payment_method_options, metadata } = req.body;
     console.log('Received request:', { priceId, payment_method_types, payment_method_options, metadata });
 
-    // Validate priceId
     if (!priceId) {
       throw new Error('Price ID is required');
     }
 
-    // Validate payment_method_types (default to ['card'] if not provided)
     const validatedPaymentMethodTypes = Array.isArray(payment_method_types) && payment_method_types.length > 0 
       ? payment_method_types 
       : ['card'];
@@ -229,39 +221,36 @@ router.post('/create-subscription', async (req, res) => {
     }
     console.log('Validated payment method types:', validatedPaymentMethodTypes);
 
-    // Create a customer
     const customer = await stripe.customers.create({
       metadata: {
         integration_check: 'accept_a_payment',
-        ...metadata, // Merge any additional metadata from request
+        ...metadata,
       },
     });
     console.log('Created customer:', customer.id);
 
-    // Create an ephemeral key for the customer
     const ephemeralKey = await stripe.ephemeralKeys.create(
       { customer: customer.id },
       { apiVersion: '2023-10-16' },
     );
     console.log('Created ephemeral key');
 
-    // Create a subscription
     const subscription = await stripe.subscriptions.create({
       customer: customer.id,
       items: [{ price: priceId }],
       payment_behavior: 'default_incomplete',
       payment_settings: {
         save_default_payment_method: 'on_subscription',
-        payment_method_types: validatedPaymentMethodTypes, // Use validated types
+        payment_method_types: validatedPaymentMethodTypes,
         payment_method_options: {
           card: {
-            ...payment_method_options?.card, // Merge any custom card options
+            ...payment_method_options?.card,
           },
         },
       },
       expand: ['latest_invoice.payment_intent'],
       metadata: {
-        ...metadata, // Merge additional metadata
+        ...metadata,
       },
     });
     console.log('Created subscription:', subscription.id);
