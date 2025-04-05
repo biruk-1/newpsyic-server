@@ -8,6 +8,7 @@
     "dev": "nodemon index.js"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.49.4",
     "bcryptjs": "^3.0.2",
     "better-sqlite3": "^11.9.1",
     "cors": "^2.8.5",
