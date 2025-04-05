@@ -1,7 +1,13 @@
 const { logger } = require('../utils/logger');
 
 function errorHandler(err, req, res, next) {
-  logger.error(err.stack);
+  // Log the full error stack
+  logger.error('Error details:', {
+    message: err.message,
+    stack: err.stack,
+    type: err.type,
+    code: err.code
+  });
 
   if (err.type === 'validation') {
     return res.status(400).json({
@@ -17,11 +23,21 @@ function errorHandler(err, req, res, next) {
     });
   }
 
+  // In development, send more detailed error information
+  if (process.env.NODE_ENV !== 'production') {
+    return res.status(500).json({
+      error: 'Internal Server Error',
+      message: err.message,
+      stack: err.stack,
+      type: err.type,
+      code: err.code
+    });
+  }
+
+  // In production, send a generic error message
   res.status(500).json({
     error: 'Internal Server Error',
-    message: process.env.NODE_ENV === 'production' 
-      ? 'An unexpected error occurred'
-      : err.message
+    message: 'An unexpected error occurred. Please try again later.'
   });
 }
 
