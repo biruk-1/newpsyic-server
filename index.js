@@ -6,12 +6,15 @@ const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
 const { errorHandler } = require('./middleware/errorHandler');
 const { setupDatabase } = require('./database');
+const { initializeFirebase } = require('./services/notificationService');
+const { initializeSchedulers } = require('./services/schedulerService');
 const authRoutes = require('./routes/auth');
 const psychicRoutes = require('./routes/psychics');
 const reviewRoutes = require('./routes/reviews');
 const bookingRoutes = require('./routes/bookings');
 const stripeRoutes = require('./routes/stripe');
-const twilioRoutes = require('./routes/twilio'); // Add Twilio routes
+const twilioRoutes = require('./routes/twilio');
+const notificationRoutes = require('./routes/notifications');
 
 const path = require('path');
 
@@ -24,6 +27,14 @@ const PORT = process.env.PORT || 3000;
 // Initialize database
 console.log("Initializing database...");
 setupDatabase();
+
+// Initialize Firebase Admin SDK for notifications
+console.log("Initializing Firebase Admin SDK...");
+initializeFirebase();
+
+// Initialize notification schedulers
+console.log("Initializing notification schedulers...");
+initializeSchedulers();
 
 // Basic security middleware
 console.log("Setting up basic security middleware...");
@@ -63,8 +74,11 @@ app.use('/api/bookings', bookingRoutes);
 console.log("Setting up stripeRoutes...");
 app.use('/api/stripe', stripeRoutes);
 
-console.log("Setting up twilioRoutes..."); // Add Twilio setup log
-app.use('/api/twilio', twilioRoutes);     // Mount Twilio routes
+console.log("Setting up twilioRoutes...");
+app.use('/api/twilio', twilioRoutes);
+
+console.log("Setting up notificationRoutes...");
+app.use('/api/notifications', notificationRoutes);
 
 // Health check endpoint
 app.get('/health', (req, res) => {
