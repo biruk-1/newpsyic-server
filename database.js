@@ -25,13 +25,75 @@ function setupDatabase() {
       password_hash TEXT NOT NULL,
       full_name TEXT NOT NULL,
       phone TEXT,
+      birth_date TEXT,
+      birth_time TEXT,
+      birth_location TEXT,
+      interests TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       role TEXT CHECK(role IN ('user', 'psychic', 'admin')) DEFAULT 'user'
     )
   `);
 
-  // Create psychics table with profile_image column
+  // Create push_tokens table
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS push_tokens (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      token TEXT NOT NULL,
+      device_type TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    )
+  `);
+
+  // Create notification_preferences table
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS notification_preferences (
+      user_id TEXT PRIMARY KEY,
+      enabled BOOLEAN DEFAULT true,
+      daily_horoscope BOOLEAN DEFAULT true,
+      psychic_updates BOOLEAN DEFAULT true,
+      moon_phases BOOLEAN DEFAULT true,
+      planetary_transits BOOLEAN DEFAULT true,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    )
+  `);
+
+  // Create notifications table
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS notifications (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      type TEXT NOT NULL,
+      title TEXT NOT NULL,
+      message TEXT NOT NULL,
+      data TEXT,
+      read BOOLEAN DEFAULT false,
+      ticket_ids TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    )
+  `);
+
+  // Create followers table
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS followers (
+      id TEXT PRIMARY KEY,
+      follower_id TEXT NOT NULL,
+      following_id TEXT NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (follower_id) REFERENCES users(id) ON DELETE CASCADE,
+      FOREIGN KEY (following_id) REFERENCES users(id) ON DELETE CASCADE,
+      UNIQUE(follower_id, following_id)
+    )
+  `);
+
+  // Create psychics table
   db.exec(`
     CREATE TABLE IF NOT EXISTS psychics (
       id TEXT PRIMARY KEY,

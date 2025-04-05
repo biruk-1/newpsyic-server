@@ -29,6 +29,72 @@ async function handleNotificationReceipts(receipts) {
   return receiptChunks;
 }
 
+// Send daily horoscope notification
+async function sendDailyHoroscopeNotification(userId, horoscopeData) {
+  try {
+    const { data: user, error: userError } = await supabase
+      .from('users')
+      .select('birth_date, notification_preferences')
+      .eq('id', userId)
+      .single();
+
+    if (userError || !user) {
+      return { success: false, error: 'User not found' };
+    }
+
+    if (!user.notification_preferences?.daily_horoscope) {
+      return { success: false, error: 'Daily horoscope notifications disabled' };
+    }
+
+    return await sendPushNotification(userId, {
+      type: 'daily_horoscope',
+      title: 'Your Daily Horoscope',
+      body: horoscopeData.prediction,
+      data: {
+        sign: horoscopeData.sign,
+        date: horoscopeData.date
+      }
+    });
+  } catch (error) {
+    console.error('Error sending daily horoscope:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+// Send psychic update notification
+async function sendPsychicUpdateNotification(psychicId, updateContent) {
+  try {
+    // Get all followers of the psychic
+    const { data: followers, error: followersError } = await supabase
+      .from('followers')
+      .select('follower_id')
+      .eq('following_id', psychicId);
+
+    if (followersError) {
+      return { success: false, error: 'Error fetching followers' };
+    }
+
+    if (!followers.length) {
+      return { success: false, error: 'No followers found' };
+    }
+
+    const followerIds = followers.map(f => f.follower_id);
+    return await sendBulkPushNotifications(followerIds, {
+      type: 'psychic_update',
+      title: 'New Update from Your Psychic',
+      body: updateContent.message,
+      data: {
+        psychicId,
+        updateType: updateContent.type,
+        timestamp: new Date().toISOString()
+      }
+    });
+  } catch (error) {
+    console.error('Error sending psychic update:', error);
+    return { success: false, error: error.message };
+  }
+}
+
 async function sendPushNotification(userId, notification) {
   try {
     // Get user's push token and notification preferences
@@ -72,14 +138,15 @@ async function sendPushNotification(userId, notification) {
     }
 
     // Check if this type of notification is enabled
-    if (!preferences[notification.type]) {
+    const notificationType = notification.type === 'daily_horoscope' ? 'daily_horoscope' : 'psychic_updates';
+    if (!preferences[notificationType]) {
       return { success: false, error: 'Notification type disabled' };
     }
 
     // Construct the message
     const message = {
       to: tokenData.token,
-      sound: notification.sound || 'default',
+      sound: 'default',
       title: notification.title,
       body: notification.body,
       data: {
@@ -87,8 +154,19 @@ async function sendPushNotification(userId, notification) {
         type: notification.type,
         timestamp: new Date().toISOString(),
       },
-      priority: notification.priority || 'high',
-      channelId: notification.channelId || 'default',
+      priority: 'high',
+      channelId: 'default',
+      ios: {
+        sound: true,
+        _displayInForeground: true,
+        badge: 1
+      },
+      android: {
+        sound: true,
+        vibrate: true,
+        channelId: 'default',
+        priority: 'high'
+      }
     };
 
     // Store the notification in the database
@@ -99,7 +177,7 @@ async function sendPushNotification(userId, notification) {
         type: notification.type,
         title: notification.title,
         message: notification.body,
-        data: notification.data || {},
+        data: JSON.stringify(notification.data || {}),
         read: false,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
@@ -130,7 +208,7 @@ async function sendPushNotification(userId, notification) {
     const { error: updateError } = await supabase
       .from('notifications')
       .update({
-        ticket_ids: ticketIds,
+        ticket_ids: JSON.stringify(ticketIds),
         updated_at: new Date().toISOString(),
       })
       .eq('id', notificationData.id);
@@ -164,34 +242,6 @@ async function sendBulkPushNotifications(userIds, notification) {
   }
 }
 
-// Send notification to all followers of a user
-async function sendFollowerNotification(followedUserId, notification) {
-  try {
-    // Get all followers of the user
-    const { data: followers, error: followersError } = await supabase
-      .from('followers')
-      .select('follower_id')
-      .eq('following_id', followedUserId);
-
-    if (followersError) {
-      return { success: false, error: 'Error fetching followers' };
-    }
-
-    if (!followers.length) {
-      return { success: false, error: 'No followers found' };
-    }
-
-    const followerIds = followers.map(f => f.follower_id);
-    return await sendBulkPushNotifications(followerIds, {
-      ...notification,
-      type: 'following'
-    });
-  } catch (error) {
-    console.error('Error sending follower notifications:', error);
-    return { success: false, error: error.message };
-  }
-}
-
 // Check notification delivery status
 async function checkNotificationStatus(notificationId) {
   try {
@@ -205,8 +255,9 @@ async function checkNotificationStatus(notificationId) {
       return { success: false, error: 'Notification not found' };
     }
 
+    const ticketIds = JSON.parse(notification.ticket_ids);
     const receipts = await handleNotificationReceipts(
-      notification.ticket_ids.map(id => ({ id }))
+      ticketIds.map(id => ({ id }))
     );
 
     return { success: true, receipts };
@@ -219,7 +270,8 @@ async function checkNotificationStatus(notificationId) {
 module.exports = {
   sendPushNotification,
   sendBulkPushNotifications,
-  sendFollowerNotification,
+  sendDailyHoroscopeNotification,
+  sendPsychicUpdateNotification,
   checkNotificationStatus,
   handleNotificationReceipts,
 };
