@@ -1,5 +1,3 @@
-// server/services/notificationService.js
-
 const { Expo } = require('expo-server-sdk');
 const { supabase } = require('../supabaseClient');
 const { sendIOSPushNotification, isValidIOSDeviceToken } = require('./apnsService');
@@ -24,6 +22,8 @@ async function handleNotificationReceipts(receipts) {
       receiptChunks.push(receiptChunk);
     } catch (error) {
       console.error('Error getting push notification receipts:', error);
+      // Suggested: Log to monitoring service
+      // logger.error('Receipts error', { error });
     }
   }
 
@@ -43,12 +43,12 @@ async function sendDailyHoroscopeNotification(userId, horoscopeData) {
       return { success: false, error: 'User not found' };
     }
 
-    if (!user.notification_preferences?.daily_horoscope) {
+    if (!user.notification_preferences?.dailyHoroscope) { // Changed from daily_horoscope
       return { success: false, error: 'Daily horoscope notifications disabled' };
     }
 
     return await sendPushNotification(userId, {
-      type: 'daily_horoscope',
+      type: 'dailyHoroscope',
       title: 'Your Daily Horoscope',
       body: horoscopeData.prediction,
       data: {
@@ -81,7 +81,7 @@ async function sendPsychicUpdateNotification(psychicId, updateContent) {
 
     const followerIds = followers.map(f => f.follower_id);
     return await sendBulkPushNotifications(followerIds, {
-      type: 'psychic_update',
+      type: 'psychicUpdate',
       title: 'New Update from Your Psychic',
       body: updateContent.message,
       data: {
@@ -139,17 +139,14 @@ async function sendPushNotification(userId, notification) {
       // Send using APNs
       const result = await sendIOSPushNotification(tokenData.token, notification);
       
-      // Handle specific iOS error cases
       if (!result.success) {
         if (result.code === 'DEVICE_NOT_REGISTERED') {
-          // Remove the invalid token from the database
           await supabase
             .from('push_tokens')
             .delete()
             .eq('user_id', userId)
             .eq('token', tokenData.token);
         } else if (result.code === 'KEY_FILE_MISSING') {
-          // Log the error but don't remove the token
           console.error('APNs key file missing. iOS notifications are disabled.');
           return { 
             success: false, 
@@ -189,7 +186,6 @@ async function sendPushNotification(userId, notification) {
 
     // For non-iOS devices, use Expo
     if (!Expo.isExpoPushToken(tokenData.token)) {
-      // Remove invalid token
       await supabase
         .from('push_tokens')
         .delete()
@@ -204,7 +200,7 @@ async function sendPushNotification(userId, notification) {
     }
 
     // Check if this type of notification is enabled
-    const notificationType = notification.type === 'daily_horoscope' ? 'daily_horoscope' : 'psychic_updates';
+    const notificationType = notification.type === 'dailyHoroscope' ? 'dailyHoroscope' : 'psychicUpdates'; // Changed from daily_horoscope and psychic_updates
     if (!preferences[notificationType]) {
       return { success: false, error: 'Notification type disabled' };
     }

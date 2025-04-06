@@ -26,7 +26,7 @@ async function sendDailyHoroscope(userId) {
     }
 
     // Check if user has enabled daily horoscope notifications
-    if (!user.notification_preferences?.dailyHoroscope) {
+    if (!user.notification_preferences?.dailyHoroscope) { // Changed from daily_horoscope
       return { success: false, error: 'Daily horoscope notifications disabled' };
     }
 
@@ -60,7 +60,7 @@ async function sendDailyHoroscopesToAll() {
     const { data: users, error } = await supabase
       .from('users')
       .select('id')
-      .eq('notification_preferences->dailyHoroscope', true);
+      .eq('notification_preferences->dailyHoroscope', true); // Changed from daily_horoscope
 
     if (error) {
       return { success: false, error: 'Error fetching users' };
@@ -101,4 +101,4 @@ function calculateZodiacSign(birthDate) {
 module.exports = {
   sendDailyHoroscope,
   sendDailyHoroscopesToAll
-}; 
+};
