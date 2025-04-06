@@ -2,6 +2,7 @@
 
 const { Expo } = require('expo-server-sdk');
 const { supabase } = require('../supabaseClient');
+const { sendIOSPushNotification, isValidIOSDeviceToken } = require('./apnsService');
 
 // Initialize Expo with access token
 const expo = new Expo({ accessToken: process.env.EXPO_ACCESS_TOKEN });
@@ -100,7 +101,7 @@ async function sendPushNotification(userId, notification) {
     // Get user's push token and notification preferences
     const { data: tokenData, error: tokenError } = await supabase
       .from('push_tokens')
-      .select('token')
+      .select('token, device_type')
       .eq('user_id', userId)
       .single();
 
@@ -122,7 +123,64 @@ async function sendPushNotification(userId, notification) {
       return { success: false, error: 'Push token not found' };
     }
 
-    if (!isValidPushToken(tokenData.token)) {
+    // Check if this is an iOS device token
+    if (tokenData.device_type === 'ios') {
+      if (!isValidIOSDeviceToken(tokenData.token)) {
+        // Remove invalid token
+        await supabase
+          .from('push_tokens')
+          .delete()
+          .eq('user_id', userId)
+          .eq('token', tokenData.token);
+
+        return { success: false, error: 'Invalid iOS push token' };
+      }
+
+      // Send using APNs
+      const result = await sendIOSPushNotification(tokenData.token, notification);
+      
+      // Handle specific iOS error cases
+      if (!result.success) {
+        if (result.code === 'DEVICE_NOT_REGISTERED') {
+          // Remove the invalid token from the database
+          await supabase
+            .from('push_tokens')
+            .delete()
+            .eq('user_id', userId)
+            .eq('token', tokenData.token);
+        }
+        return result;
+      }
+      
+      // Store the notification in the database for iOS
+      const { data: notificationData, error: notificationError } = await supabase
+        .from('notifications')
+        .insert({
+          user_id: userId,
+          type: notification.type,
+          title: notification.title,
+          message: notification.body,
+          data: JSON.stringify(notification.data || {}),
+          read: false,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .select()
+        .single();
+
+      if (notificationError) {
+        console.error('Error storing notification:', notificationError);
+      }
+
+      return {
+        success: true,
+        message: 'iOS notification sent successfully',
+        notificationId: notificationData?.id
+      };
+    }
+
+    // For non-iOS devices, use Expo
+    if (!Expo.isExpoPushToken(tokenData.token)) {
       // Remove invalid token
       await supabase
         .from('push_tokens')
@@ -156,11 +214,6 @@ async function sendPushNotification(userId, notification) {
       },
       priority: 'high',
       channelId: 'default',
-      ios: {
-        sound: true,
-        _displayInForeground: true,
-        badge: 1
-      },
       android: {
         sound: true,
         vibrate: true,
@@ -199,28 +252,15 @@ async function sendPushNotification(userId, notification) {
         const ticketChunk = await expo.sendPushNotificationsAsync(chunk);
         tickets.push(...ticketChunk);
       } catch (error) {
-        console.error('Error sending notification chunk:', error);
+        console.error('Error sending chunk:', error);
       }
-    }
-
-    // Store the ticket IDs with the notification
-    const ticketIds = tickets.map(ticket => ticket.id);
-    const { error: updateError } = await supabase
-      .from('notifications')
-      .update({
-        ticket_ids: JSON.stringify(ticketIds),
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', notificationData.id);
-
-    if (updateError) {
-      console.error('Error updating notification with ticket IDs:', updateError);
     }
 
     return {
       success: true,
-      tickets,
+      message: 'Notification sent successfully',
       notificationId: notificationData.id,
+      tickets
     };
   } catch (error) {
     console.error('Error sending push notification:', error);
