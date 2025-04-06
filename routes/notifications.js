@@ -212,4 +212,50 @@ router.put('/read-all', authenticateToken, async (req, res) => {
   }
 });
 
+// Test push notification endpoint
+router.post('/test', authenticateToken, async (req, res) => {
+  try {
+    const { token } = req.body;
+    
+    if (!token) {
+      return res.status(400).json({ error: 'Push token is required' });
+    }
+
+    if (!Expo.isExpoPushToken(token)) {
+      return res.status(400).json({ error: 'Invalid Expo push token' });
+    }
+
+    const message = {
+      to: token,
+      sound: process.env.EXPO_PUSH_NOTIFICATION_SOUND || 'default',
+      title: 'Test Notification',
+      body: 'This is a test notification from your server',
+      data: { type: 'test' },
+      priority: process.env.EXPO_PUSH_NOTIFICATION_PRIORITY || 'high',
+      channelId: process.env.EXPO_PUSH_NOTIFICATION_CHANNEL_ID || 'default',
+    };
+
+    const chunks = expo.chunkPushNotifications([message]);
+    const tickets = [];
+
+    for (let chunk of chunks) {
+      try {
+        const ticketChunk = await expo.sendPushNotificationsAsync(chunk);
+        tickets.push(...ticketChunk);
+      } catch (error) {
+        console.error('Error sending notification chunk:', error);
+      }
+    }
+
+    res.json({ 
+      success: true, 
+      message: 'Test notification sent successfully',
+      tickets 
+    });
+  } catch (error) {
+    console.error('Error sending test notification:', error);
+    res.status(500).json({ error: 'Failed to send test notification' });
+  }
+});
+
 module.exports = router; 
