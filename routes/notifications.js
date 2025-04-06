@@ -10,10 +10,8 @@ const {
   checkNotificationStatus 
 } = require('../services/notificationService');
 
-// Initialize Expo client
 const expo = new Expo({ accessToken: process.env.EXPO_ACCESS_TOKEN });
 
-// Get user's notification preferences
 router.get('/preferences', authenticateToken, async (req, res) => {
   try {
     const preferences = await db.get(
@@ -36,7 +34,6 @@ router.get('/preferences', authenticateToken, async (req, res) => {
   }
 });
 
-// Update user's notification preferences
 router.put('/preferences', authenticateToken, async (req, res) => {
   try {
     const preferences = req.body;
@@ -63,11 +60,11 @@ router.put('/preferences', authenticateToken, async (req, res) => {
   }
 });
 
-// Store push token
 router.post('/token', authenticateToken, async (req, res) => {
   try {
     const { token, deviceType } = req.body;
     if (!Expo.isExpoPushToken(token)) {
+      console.log(`Invalid Expo push token received: ${token}`);
       return res.status(400).json({ error: 'Invalid Expo push token' });
     }
 
@@ -77,6 +74,7 @@ router.post('/token', authenticateToken, async (req, res) => {
        VALUES (?, ?, ?, datetime('now'))`,
       [req.user.id, token, deviceType || 'unknown']
     );
+    console.log(`Push token stored for user ${req.user.id}: ${token}`);
     res.json({ success: true });
   } catch (error) {
     console.error('Error storing push token:', error);
@@ -84,7 +82,6 @@ router.post('/token', authenticateToken, async (req, res) => {
   }
 });
 
-// Get user's notifications
 router.get('/', authenticateToken, async (req, res) => {
   try {
     const { limit = 50, offset = 0, type } = req.query;
@@ -107,7 +104,6 @@ router.get('/', authenticateToken, async (req, res) => {
   }
 });
 
-// Send a notification
 router.post('/send', authenticateToken, async (req, res) => {
   try {
     const { userId, title, body, data, type } = req.body;
@@ -138,7 +134,6 @@ router.post('/send', authenticateToken, async (req, res) => {
   }
 });
 
-// Send notification to followers
 router.post('/send-to-followers', authenticateToken, async (req, res) => {
   try {
     const { followedUserId, title, body, data } = req.body;
@@ -168,7 +163,6 @@ router.post('/send-to-followers', authenticateToken, async (req, res) => {
   }
 });
 
-// Check notification status
 router.get('/:id/status', authenticateToken, async (req, res) => {
   try {
     const result = await checkNotificationStatus(req.params.id);
@@ -184,7 +178,6 @@ router.get('/:id/status', authenticateToken, async (req, res) => {
   }
 });
 
-// Mark notification as read
 router.put('/:id/read', authenticateToken, async (req, res) => {
   try {
     await db.run(
@@ -198,7 +191,6 @@ router.put('/:id/read', authenticateToken, async (req, res) => {
   }
 });
 
-// Mark all notifications as read
 router.put('/read-all', authenticateToken, async (req, res) => {
   try {
     await db.run(
@@ -212,17 +204,17 @@ router.put('/read-all', authenticateToken, async (req, res) => {
   }
 });
 
-// Test push notification endpoint - No authentication required for testing purposes
-// Note: In production, secure this endpoint or remove it
 router.post('/test', async (req, res) => {
   try {
     const { token } = req.body;
     
     if (!token) {
+      console.log('Test endpoint called with no token');
       return res.status(400).json({ error: 'Push token is required' });
     }
 
     if (!Expo.isExpoPushToken(token)) {
+      console.log(`Invalid Expo push token in test: ${token}`);
       return res.status(400).json({ error: 'Invalid Expo push token' });
     }
 
@@ -236,6 +228,7 @@ router.post('/test', async (req, res) => {
       channelId: process.env.EXPO_PUSH_NOTIFICATION_CHANNEL_ID || 'default',
     };
 
+    console.log(`Preparing test notification for token ${token}:`, message);
     const chunks = expo.chunkPushNotifications([message]);
     const tickets = [];
 
@@ -243,8 +236,9 @@ router.post('/test', async (req, res) => {
       try {
         const ticketChunk = await expo.sendPushNotificationsAsync(chunk);
         tickets.push(...ticketChunk);
+        console.log(`Test notification sent, tickets:`, ticketChunk);
       } catch (error) {
-        console.error('Error sending notification chunk:', error);
+        console.error('Error sending test notification chunk:', error);
       }
     }
 
