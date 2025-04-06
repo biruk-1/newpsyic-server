@@ -212,8 +212,8 @@ router.put('/read-all', authenticateToken, async (req, res) => {
   }
 });
 
-// Test push notification endpoint
-router.post('/test', authenticateToken, async (req, res) => {
+// Test push notification endpoint - No authentication required for testing purposes
+router.post('/test', async (req, res) => {
   try {
     const { token } = req.body;
     
