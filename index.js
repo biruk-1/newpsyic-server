@@ -17,6 +17,7 @@ const twilioRoutes = require('./routes/twilio');
 const notificationRoutes = require('./routes/notifications');
 
 const path = require('path');
+const fs = require('fs');
 
 // Load environment variables
 const app = express();
@@ -29,6 +30,19 @@ setupDatabase();
 // Initialize notification schedulers
 console.log("Initializing notification schedulers...");
 initializeSchedulers();
+
+// Check for APNs key file
+const apnsKeyPath = path.join(__dirname, 'certs', 'AuthKey.p8');
+
+if (!fs.existsSync(apnsKeyPath)) {
+  console.warn('WARNING: APNs key file not found at', apnsKeyPath);
+  console.warn('iOS push notifications will not work until the key file is added.');
+  console.warn('To fix this:');
+  console.warn('1. Download your APNs key (.p8 file) from Apple Developer Portal');
+  console.warn('2. Create a "certs" directory in your server folder');
+  console.warn('3. Place the .p8 file in the certs directory as "AuthKey.p8"');
+  console.warn('4. Redeploy your application');
+}
 
 // Basic security middleware
 app.use(helmet());

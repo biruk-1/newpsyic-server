@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.39.7",
+    "apn": "^2.2.0",
     "bcryptjs": "^2.4.3",
     "better-sqlite3": "^8.7.0",
     "cors": "^2.8.5",

@@ -1,19 +1,37 @@
 const apn = require('apn');
 const path = require('path');
+const fs = require('fs');
 
-// Initialize APNs provider
-const apnProvider = new apn.Provider({
-    token: {
-        key: path.join(__dirname, '../certs/AuthKey.p8'), // Path to your .p8 file
-        keyId: process.env.APNS_KEY_ID, // Your Key ID from Apple Developer account
-        teamId: process.env.APNS_TEAM_ID, // Your Team ID from Apple Developer account
-    },
-    production: process.env.NODE_ENV === 'production', // Set to false for development
-    bundleId: process.env.APNS_BUNDLE_ID // Your app's bundle ID
-});
+// Check if the APNs key file exists
+const apnsKeyPath = path.join(__dirname, '../certs', 'AuthKey.p8');
+const keyFileExists = fs.existsSync(apnsKeyPath);
+
+// Initialize APNs provider only if the key file exists
+let apnProvider = null;
+if (keyFileExists) {
+    apnProvider = new apn.Provider({
+        token: {
+            key: apnsKeyPath,
+            keyId: process.env.APNS_KEY_ID,
+            teamId: process.env.APNS_TEAM_ID,
+        },
+        production: process.env.NODE_ENV === 'production',
+        bundleId: process.env.APNS_BUNDLE_ID
+    });
+}
 
 // Send iOS push notification
 async function sendIOSPushNotification(deviceToken, notification) {
+    // If the key file doesn't exist, return an error
+    if (!keyFileExists) {
+        console.error('APNs key file not found. iOS push notifications are disabled.');
+        return {
+            success: false,
+            error: 'APNs key file not found. iOS push notifications are disabled.',
+            code: 'KEY_FILE_MISSING'
+        };
+    }
+
     try {
         const note = new apn.Notification();
         

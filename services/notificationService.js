@@ -148,6 +148,14 @@ async function sendPushNotification(userId, notification) {
             .delete()
             .eq('user_id', userId)
             .eq('token', tokenData.token);
+        } else if (result.code === 'KEY_FILE_MISSING') {
+          // Log the error but don't remove the token
+          console.error('APNs key file missing. iOS notifications are disabled.');
+          return { 
+            success: false, 
+            error: 'APNs key file missing. iOS notifications are disabled.',
+            code: 'KEY_FILE_MISSING'
+          };
         }
         return result;
       }
