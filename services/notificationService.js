@@ -22,8 +22,6 @@ async function handleNotificationReceipts(receipts) {
       receiptChunks.push(receiptChunk);
     } catch (error) {
       console.error('Error getting push notification receipts:', error);
-      // Suggested: Log to monitoring service
-      // logger.error('Receipts error', { error });
     }
   }
 
@@ -43,7 +41,7 @@ async function sendDailyHoroscopeNotification(userId, horoscopeData) {
       return { success: false, error: 'User not found' };
     }
 
-    if (!user.notification_preferences?.dailyHoroscope) { // Changed from daily_horoscope
+    if (!user.notification_preferences?.dailyHoroscope) {
       return { success: false, error: 'Daily horoscope notifications disabled' };
     }
 
@@ -65,7 +63,6 @@ async function sendDailyHoroscopeNotification(userId, horoscopeData) {
 // Send psychic update notification
 async function sendPsychicUpdateNotification(psychicId, updateContent) {
   try {
-    // Get all followers of the psychic
     const { data: followers, error: followersError } = await supabase
       .from('followers')
       .select('follower_id')
@@ -106,6 +103,7 @@ async function sendPushNotification(userId, notification) {
       .single();
 
     if (tokenError) {
+      console.log(`No push token found for user ${userId}`);
       return { success: false, error: 'Push token not found' };
     }
 
@@ -116,23 +114,24 @@ async function sendPushNotification(userId, notification) {
       .single();
 
     if (prefError) {
+      console.log(`No notification preferences found for user ${userId}`);
       return { success: false, error: 'Notification preferences not found' };
     }
 
     if (!tokenData?.token) {
+      console.log(`Push token missing for user ${userId}`);
       return { success: false, error: 'Push token not found' };
     }
 
     // Check if this is an iOS device token
     if (tokenData.device_type === 'ios') {
       if (!isValidIOSDeviceToken(tokenData.token)) {
-        // Remove invalid token
         await supabase
           .from('push_tokens')
           .delete()
           .eq('user_id', userId)
           .eq('token', tokenData.token);
-
+        console.log(`Invalid iOS push token for user ${userId}: ${tokenData.token}`);
         return { success: false, error: 'Invalid iOS push token' };
       }
 
@@ -146,6 +145,7 @@ async function sendPushNotification(userId, notification) {
             .delete()
             .eq('user_id', userId)
             .eq('token', tokenData.token);
+          console.log(`Device not registered for user ${userId}, token removed`);
         } else if (result.code === 'KEY_FILE_MISSING') {
           console.error('APNs key file missing. iOS notifications are disabled.');
           return { 
@@ -154,6 +154,7 @@ async function sendPushNotification(userId, notification) {
             code: 'KEY_FILE_MISSING'
           };
         }
+        console.log(`Failed to send iOS notification to user ${userId}: ${result.error}`);
         return result;
       }
       
@@ -175,6 +176,8 @@ async function sendPushNotification(userId, notification) {
 
       if (notificationError) {
         console.error('Error storing notification:', notificationError);
+      } else {
+        console.log(`iOS notification sent and stored for user ${userId}, notificationId: ${notificationData?.id}`);
       }
 
       return {
@@ -191,21 +194,21 @@ async function sendPushNotification(userId, notification) {
         .delete()
         .eq('user_id', userId)
         .eq('token', tokenData.token);
-
+      console.log(`Invalid Expo push token for user ${userId}: ${tokenData.token}`);
       return { success: false, error: 'Invalid push token' };
     }
 
     if (!preferences?.enabled) {
+      console.log(`Push notifications disabled for user ${userId}`);
       return { success: false, error: 'Push notifications not enabled' };
     }
 
-    // Check if this type of notification is enabled
-    const notificationType = notification.type === 'dailyHoroscope' ? 'dailyHoroscope' : 'psychicUpdates'; // Changed from daily_horoscope and psychic_updates
+    const notificationType = notification.type === 'dailyHoroscope' ? 'dailyHoroscope' : 'psychicUpdates';
     if (!preferences[notificationType]) {
+      console.log(`Notification type ${notificationType} disabled for user ${userId}`);
       return { success: false, error: 'Notification type disabled' };
     }
 
-    // Construct the message
     const message = {
       to: tokenData.token,
       sound: 'default',
@@ -226,7 +229,6 @@ async function sendPushNotification(userId, notification) {
       }
     };
 
-    // Store the notification in the database
     const { data: notificationData, error: notificationError } = await supabase
       .from('notifications')
       .insert({
@@ -247,7 +249,6 @@ async function sendPushNotification(userId, notification) {
       return { success: false, error: 'Failed to store notification' };
     }
 
-    // Send the notification
     const chunks = expo.chunkPushNotifications([message]);
     const tickets = [];
 
@@ -255,6 +256,7 @@ async function sendPushNotification(userId, notification) {
       try {
         const ticketChunk = await expo.sendPushNotificationsAsync(chunk);
         tickets.push(...ticketChunk);
+        console.log(`Expo notification sent to user ${userId}, tickets:`, ticketChunk);
       } catch (error) {
         console.error('Error sending chunk:', error);
       }
@@ -279,6 +281,7 @@ async function sendBulkPushNotifications(userIds, notification) {
       const result = await sendPushNotification(userId, notification);
       results.push({ userId, ...result });
     }
+    console.log('Bulk notifications sent:', results);
     return { success: true, results };
   } catch (error) {
     console.error('Error sending bulk notifications:', error);
@@ -296,6 +299,7 @@ async function checkNotificationStatus(notificationId) {
       .single();
 
     if (error || !notification?.ticket_ids) {
+      console.log(`Notification ${notificationId} not found`);
       return { success: false, error: 'Notification not found' };
     }
 
@@ -303,6 +307,7 @@ async function checkNotificationStatus(notificationId) {
     const receipts = await handleNotificationReceipts(
       ticketIds.map(id => ({ id }))
     );
+    console.log(`Notification status checked for ${notificationId}:`, receipts);
 
     return { success: true, receipts };
   } catch (error) {
